@@ -1,5 +1,5 @@
 import psycopg2
-from datetime import datetime
+from datetime import datetime, date
 import json
 import requests
 import logging
@@ -11,6 +11,7 @@ import os
 logging.basicConfig(level=logging.INFO, filename="log.log", filemode='a',
                     format="%(asctime)s-%(levelname)s - %(message)s")
 
+load_dotenv() 
 
 #Data extractions function    
 def extract_data():
@@ -30,7 +31,7 @@ def extract_data():
         logging.info(err)
         
 
-# function to date transformation
+# function for date transformation
 def convert_year(year):
     if year is None or not str(year).strip():  # Check for None or empty string
         return None  
