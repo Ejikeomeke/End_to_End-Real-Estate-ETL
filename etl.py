@@ -26,12 +26,13 @@ def extract_data():
         response = requests.get(url, headers=headers)
         
         raw_data = response.json()
+        logging.info("connection and retrieval successful")
         return raw_data
     except requests.exceptions.RequestException as err:
         logging.info(err)
         
 
-# function for date transformation
+# function for date_data transformation
 def convert_year(year):
     if year is None or not str(year).strip():  # Check for None or empty string
         return None  
@@ -40,3 +41,67 @@ def convert_year(year):
     except ValueError as err:
         logging.info(err)
         return None  # Handle other invalid inputs  
+    
+    
+# Function for data transformation 
+def transform_data(raw_data):
+    property_location = []
+    for entries in raw_data:
+        address = entries.get('addressLine1')
+        city = entries.get('city')
+        county = entries.get('county')
+        latitude = entries.get('latitude')
+        longitude = entries.get('longitude')
+        
+        property_location.append({
+            'address':address,
+            'city':city,
+            'county':county,
+            'latitude':latitude,
+            'longitude':longitude
+        } 
+                                 )
+
+        
+    listing_details = []
+    for entries in raw_data: 
+        property_id = entries['id']
+        price= entries.get('price')
+        listing_type= entries.get('listingType')
+        listing_type = entries.get('listingType')
+        listed_date = entries.get('listedDate')
+        status = entries.get('status')
+
+        
+        listing_details.append({
+            'property_id':property_id,
+            'price':price,
+            'listing_type':listing_type,
+            'listed_date':listed_date,
+            'status':status,
+            }
+                               )
+        
+    
+    property_specifications = []
+    for entries in raw_data:
+        property_id = entries['id']
+        number_of_rooms = entries.get('bedrooms')
+        number_of_bathrooms = entries.get('bathrooms')
+        property_size = entries.get('squareFootage')
+        yearBuilt = convert_year(entries.get('yearBuilt'))
+        propertyType = entries.get('propertyType')
+        lotSize = entries.get('lotSize')
+        
+        property_specifications.append({
+            'property_id':property_id,
+            'number_of_rooms':number_of_rooms,
+            'number_of_bathrooms': number_of_bathrooms,
+            'property_size':property_size,
+            'year_built':yearBuilt,
+            'property_type':propertyType,
+            'lot_size':lotSize
+            }
+                                       )
+        
+    return property_location, listing_details, property_specifications    
