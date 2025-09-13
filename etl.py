@@ -193,3 +193,73 @@ def create_tables():
     except Exception as e:
         logging.error(f"connection error:{e}")
         raise  
+
+#load property_location Table
+def load_property_location(data):
+    conn=database_connection()
+    cursor = conn.cursor()
+    insert_query =""" INSERT INTO royal_realtors.property_location(address, city, county, latitude, longitude)
+                        VALUES (%s, %s, %s, %s, %s);"""
+                        
+    
+                
+    data_to_insert = [(entry['address'], entry['city'],  entry['county'], entry['latitude'], entry['longitude'])
+                    for entry in data]
+    cursor.executemany(insert_query, data_to_insert)
+
+    # Commit the transaction
+    conn.commit()
+    print(f"Inserted {cursor.rowcount} rows into property_-location table.")
+        
+
+#load property specification table
+def load_property_specification(data):
+    conn=database_connection()
+    cursor = conn.cursor()
+    insert_query =""" INSERT INTO royal_realtors.property_specification(property_id,  citnumber_of_rooms, number_of_bathrooms, property_size, year_built, property_type, lot_size)
+                           VALUES (%s, %s, %s, %s, %s, %s, %s);"""
+                           
+    data_to_insert = [(entry['property_id'], entry['number_of_rooms'],  entry['number_of_bathrooms'], entry['property_size'], entry['year_built'], entry['property_type'], entry['lot_size'])
+                     for entry in data]
+    cursor.executemany(insert_query, data_to_insert)                       
+                           
+    # Commit the transaction
+    conn.commit()
+    print(f"Inserted {cursor.rowcount} rows into property_specification table.")
+    
+
+#load property_listing table
+def load_property_listing(data):
+
+    conn=database_connection()
+    cursor = conn.cursor()
+    insert_query =""" INSERT INTO royal_realtors.property_listing(
+                            property_id,
+                            price, 
+                            listing_type,
+                            listed_date, 
+                            status)
+                           VALUES (%s, %s, %s, %s, %s);"""
+                           
+    data_to_insert = [(entry['property_id'],
+                       entry['price'], 
+                       entry['listing_type'],
+                       entry['listed_date'],
+                       entry['status'])
+                     for entry in data]
+    cursor.executemany(insert_query, data_to_insert)                       
+                           
+    # Commit the transaction
+    conn.commit()
+    print(f"Inserted {cursor.rowcount} rows into listing_tables table.")
+    cursor.close()
+    conn.close()
+    
+    
+if __name__ == "__main__":
+    raw_data = extract_data()
+    location_data, listing_data, specification_data = transform_data(raw_data)
+    create_tables()
+    load_property_location(location_data)
+    load_property_specification(specification_data)
+    load_property_listing(listing_data)
