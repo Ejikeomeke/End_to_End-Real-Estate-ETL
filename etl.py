@@ -143,3 +143,54 @@ def database_connection():
     except Exception as e:
         logging.error(f"error: {e}")
         raise  # Raise exceptions
+
+
+# creating database schema, tables and relationship
+def create_tables():
+    conn = database_connection()
+    cur = conn.cursor()
+    
+    create_table_querry =   """
+                                CREATE SCHEMA IF NOT EXISTS royal_realtors;
+                                DROP TABLE IF EXISTS royal_realtors.property_listing CASCADE;
+                                DROP TABLE IF EXISTS royal_realtors.property_specification CASCADE;
+                                DROP TABLE IF EXISTS royal_realtors.property_location CASCADE;
+                                
+                                CREATE TABLE royal_realtors.property_location(
+                                    location_id SERIAL PRIMARY KEY,
+                                    address VARCHAR (300),
+                                    city VARCHAR (150),
+                                    county VARCHAR (150),
+                                    latitude FLOAT,
+                                    longitude FLOAT);
+                                    
+                                
+                                
+                                CREATE TABLE royal_realtors.property_specification(
+                                    property_id VARCHAR PRIMARY KEY,
+                                    location_id SERIAL,
+                                    citnumber_of_rooms INTEGER,
+                                    number_of_bathrooms INTEGER,
+                                    property_size FLOAT,
+                                    year_built DATE,
+                                    property_type VARCHAR(100),
+                                    lot_size FLOAT,
+                                    FOREIGN KEY (location_id) REFERENCES royal_realtors.property_location(location_id)
+                                );
+                                
+                                
+                                CREATE TABLE royal_realtors.property_listing(
+                                    listing_id SERIAL PRIMARY KEY,
+                                    property_id VARCHAR,
+                                    price FLOAT,
+                                    listing_type  VARCHAR(150),
+                                    listed_date DATE,
+                                    status VARCHAR(50),
+                                    FOREIGN KEY (property_id) REFERENCES royal_realtors.property_specification(property_id)
+                                );
+                                
+                                    """
+                                    
+    cur.execute(create_table_querry)
+    conn.commit()
+    
