@@ -103,5 +103,43 @@ def transform_data(raw_data):
             'lot_size':lotSize
             }
                                        )
+    logging.info("data transformation completed")   
+    return property_location, listing_details, property_specifications  
+
+
+def database_connection():
+    try:
+        # Retrieve environment variables
+        user_name=os.getenv("USER_NAME")
+        password=os.getenv("PASS_WORD")
+        database_name=os.getenv("DATA_BASE")
+        host = os.getenv("HOST_NAME")
+        port = os.getenv("PORT_NUMBER")
+
+        # Validate environment variables
+        if not all([user_name, password, database_name, host, port]):
+            missing_variables = [var for var, value in [
+                ("USERNAME", user_name),
+                ("PASSWORD", password),
+                ("DATABASE", database_name),
+                ("HOST_NAME", host),
+                ("PORT_NUMBER", port)
+            ] if not value]
+            logging.error(f"Missing environment variables: {', '.join(missing_variables)}")
+            raise ValueError(f"Missing environment variables: {', '.join(missing_variables)}")
+
+        # Establish database connection
+        connection = psycopg2.connect(
+            dbname=database_name,
+            user=user_name,
+            password=password,
+            host=host,
+            port=port
+            )
         
-    return property_location, listing_details, property_specifications    
+        logging.info("Connected to database successfully")
+        return connection
+
+    except Exception as e:
+        logging.error(f"error: {e}")
+        raise  # Raise exceptions
