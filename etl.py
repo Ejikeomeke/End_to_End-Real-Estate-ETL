@@ -6,14 +6,12 @@ import logging
 from dotenv import load_dotenv
 import os
 
-
-#logging configuration
 logging.basicConfig(level=logging.INFO, filename="log.log", filemode='a',
                     format="%(asctime)s-%(levelname)s - %(message)s")
 
-load_dotenv() 
+load_dotenv()
 
-#Data extractions function    
+#Data extractions    
 def extract_data():
     try:
         url = "https://api.rentcast.io/v1/listings/sale?city=Austin&state=TX&status=Active&limit=500"
@@ -26,14 +24,14 @@ def extract_data():
         response = requests.get(url, headers=headers)
         
         raw_data = response.json()
-        logging.info("connection and retrieval successful")
         return raw_data
     except requests.exceptions.RequestException as err:
         logging.info(err)
         
 
-# function for date_data transformation
+ # date formating and validation
 def convert_year(year):
+    from datetime import date
     if year is None or not str(year).strip():  # Check for None or empty string
         return None  
     try:
@@ -41,9 +39,9 @@ def convert_year(year):
     except ValueError as err:
         logging.info(err)
         return None  # Handle other invalid inputs  
+        
     
-    
-# Function for data transformation 
+# data transformation 
 def transform_data(raw_data):
     property_location = []
     for entries in raw_data:
@@ -61,14 +59,13 @@ def transform_data(raw_data):
             'longitude':longitude
         } 
                                  )
+    logging.info("property_location transformation completed")
 
-        
     listing_details = []
     for entries in raw_data: 
         property_id = entries['id']
         price= entries.get('price')
         listing_type= entries.get('listingType')
-        listing_type = entries.get('listingType')
         listed_date = entries.get('listedDate')
         status = entries.get('status')
 
@@ -81,7 +78,7 @@ def transform_data(raw_data):
             'status':status,
             }
                                )
-        
+    logging.info("listing_details transformation completed")    
     
     property_specifications = []
     for entries in raw_data:
@@ -103,8 +100,9 @@ def transform_data(raw_data):
             'lot_size':lotSize
             }
                                        )
-    logging.info("data transformation completed")   
-    return property_location, listing_details, property_specifications  
+    logging.info("all data transformed succesfully")
+        
+    return property_location, property_specifications, listing_details 
 
 
 def database_connection():
@@ -139,13 +137,13 @@ def database_connection():
         
         logging.info("Connected to database successfully")
         return connection
-
+    #handle database connection exceptions
     except Exception as e:
         logging.error(f"error: {e}")
         raise  # Raise exceptions
 
 
-# creating database schema, tables and relationship
+# creating database schema, tables and relationship using context manager
 def create_tables():
     try:
         with database_connection() as conn:
@@ -154,8 +152,7 @@ def create_tables():
                     """CREATE SCHEMA IF NOT EXISTS royal_realtors;""",
                     """DROP TABLE IF EXISTS royal_realtors.property_listing CASCADE;""",
                     """DROP TABLE IF EXISTS royal_realtors.property_specification CASCADE;""",
-                    """DROP TABLE IF EXISTS royal_realtors.property_location CASCADE;""",
-                                            
+                    """DROP TABLE IF EXISTS royal_realtors.property_location CASCADE;""",                       
                     """CREATE TABLE royal_realtors.property_location(
                         location_id SERIAL PRIMARY KEY,
                         address VARCHAR (300),
@@ -167,99 +164,122 @@ def create_tables():
                     """CREATE TABLE royal_realtors.property_specification(
                         property_id VARCHAR PRIMARY KEY,
                         location_id SERIAL,
-                        citnumber_of_rooms INTEGER,
+                        number_of_rooms INTEGER,
                         number_of_bathrooms INTEGER,
                         property_size FLOAT,
                         year_built DATE,
                         property_type VARCHAR(100),
-                        lot_size FLOAT,
-                        FOREIGN KEY (location_id) REFERENCES royal_realtors.property_location(location_id)
+                        lot_size FLOAT
                         );""",
                                             
                     """CREATE TABLE royal_realtors.property_listing(
-                        listing_id SERIAL PRIMARY KEY,
+                        location_id INT,
                         property_id VARCHAR,
+                        PRIMARY KEY (location_id, property_id),
                         price FLOAT,
                         listing_type  VARCHAR(150),
                         listed_date DATE,
                         status VARCHAR(50),
+                        FOREIGN KEY (location_id) REFERENCES royal_realtors.property_location(location_id),
                         FOREIGN KEY (property_id) REFERENCES royal_realtors.property_specification(property_id)
                         );"""
                         ]
                 for querry in querries:
                     cur.execute(querry)
+                    conn.commit()
                     logging.info(f"Executed Querry: {querry.split()[:30]}")
-
+    #handle schema creation exceptions
     except Exception as e:
         logging.error(f"connection error:{e}")
-        raise  
+        raise       
 
-#load property_location Table
-def load_property_location(data):
-    conn=database_connection()
-    cursor = conn.cursor()
-    insert_query =""" INSERT INTO royal_realtors.property_location(address, city, county, latitude, longitude)
-                        VALUES (%s, %s, %s, %s, %s);"""
-                        
-    
+#loading data into database 
+def load_data(property_location, property_specification, property_listing ):
+    try:
+        with database_connection() as conn:
+            with conn.cursor() as cursor:
                 
-    data_to_insert = [(entry['address'], entry['city'],  entry['county'], entry['latitude'], entry['longitude'])
-                    for entry in data]
-    cursor.executemany(insert_query, data_to_insert)
+                #loading property_location table
+                insert_location_query =""" INSERT INTO royal_realtors.property_location(address, city, county, latitude, longitude)
+                                    VALUES (%s, %s, %s, %s, %s)
+                                    RETURNING location_id;"""
+                location_ids = []               
+                for entry in property_location:
+                    cursor.execute(insert_location_query, (
+                        entry['address'],
+                        entry['city'], 
+                        entry['county'],
+                        entry['latitude'],
+                        entry['longitude']
+                        )
+                                   )
+                    location_id = cursor.fetchone()[0]
+                    location_ids.append(location_id) #save location_id for loading as secodary key in other tables
+                logging.info(f"Inserted {len(location_ids)} rows into property_-location table.")
+                
+                #loading property_specification table
+                insert_specification_query ="""
+                    INSERT INTO royal_realtors.property_specification(
+                        property_id,
+                        number_of_rooms,
+                        number_of_bathrooms,
+                        property_size,
+                        year_built,
+                        property_type,
+                        lot_size
+                        )
+                        VALUES (%s, %s, %s, %s, %s, %s, %s)
+                        RETURNING property_id;"""
+                 
+                property_ids = []              
+                for i, entry in enumerate(property_specification):
+                    cursor.execute(insert_specification_query, (
+                        entry['property_id'],
+                        entry['number_of_rooms'], 
+                        entry['number_of_bathrooms'],
+                        entry['property_size'],
+                        entry['year_built'],
+                        entry['property_type'],
+                        entry['lot_size']
+                    )
+                    )
+                    property_id = cursor.fetchone()[0]
+                    property_ids.append(property_id)
+                logging.info(f"Inserted {len(property_ids)} rows into property_specification table.")
 
-    # Commit the transaction
-    conn.commit()
-    print(f"Inserted {cursor.rowcount} rows into property_-location table.")
-        
-
-#load property specification table
-def load_property_specification(data):
-    conn=database_connection()
-    cursor = conn.cursor()
-    insert_query =""" INSERT INTO royal_realtors.property_specification(property_id,  citnumber_of_rooms, number_of_bathrooms, property_size, year_built, property_type, lot_size)
-                           VALUES (%s, %s, %s, %s, %s, %s, %s);"""
-                           
-    data_to_insert = [(entry['property_id'], entry['number_of_rooms'],  entry['number_of_bathrooms'], entry['property_size'], entry['year_built'], entry['property_type'], entry['lot_size'])
-                     for entry in data]
-    cursor.executemany(insert_query, data_to_insert)                       
-                           
-    # Commit the transaction
-    conn.commit()
-    print(f"Inserted {cursor.rowcount} rows into property_specification table.")
+                #loading property listing table
+                insert_listing_query =""" INSERT INTO royal_realtors.property_listing(
+                    location_id,
+                    property_id,
+                    price, 
+                    listing_type,
+                    listed_date, 
+                    status
+                    )
+                        VALUES (%s, %s, %s, %s, %s, %s);"""
+                
+                for i, entry in enumerate(property_listing):
+                    cursor.execute(insert_listing_query, 
+                        (
+                            location_ids[i],
+                            property_ids[i],
+                            entry['price'],
+                            entry['listing_type'],
+                            entry['listed_date'],
+                            entry['status']
+                            )
+                    )                                    
+                
+                logging.info(f"Inserted {len(location_ids)} rows into property_listing table.")
+                conn.commit()
+    #handle exceptions               
+    except Exception as err:
+        logging.error(f"data loading error:: {err}")            
+        raise  
     
 
-#load property_listing table
-def load_property_listing(data):
-
-    conn=database_connection()
-    cursor = conn.cursor()
-    insert_query =""" INSERT INTO royal_realtors.property_listing(
-                            property_id,
-                            price, 
-                            listing_type,
-                            listed_date, 
-                            status)
-                           VALUES (%s, %s, %s, %s, %s);"""
-                           
-    data_to_insert = [(entry['property_id'],
-                       entry['price'], 
-                       entry['listing_type'],
-                       entry['listed_date'],
-                       entry['status'])
-                     for entry in data]
-    cursor.executemany(insert_query, data_to_insert)                       
-                           
-    # Commit the transaction
-    conn.commit()
-    print(f"Inserted {cursor.rowcount} rows into listing_tables table.")
-    cursor.close()
-    conn.close()
-    
-    
 if __name__ == "__main__":
-    raw_data = extract_data()
-    location_data, listing_data, specification_data = transform_data(raw_data)
+    raw_data =extract_data()
+    location_data, specification_data, listing_data = transform_data(raw_data)
     create_tables()
-    load_property_location(location_data)
-    load_property_specification(specification_data)
-    load_property_listing(listing_data)
+    load_data(location_data, specification_data, listing_data)
