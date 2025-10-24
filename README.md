@@ -9,3 +9,9 @@ However, the company is currently facing a significant data challenge that hinde
 
 #### Inefficient Data Processing Workflow:
 The current data processing system is cumbersome and inefficient, leading to delays in accessing critical property information.
+#### Disparate Datasets and Inconsistent Formats:
+This disorganisation complicates data analysis andreporting, making it challenging for agents to derive actionable insights and for management to make informed strategic decisions.
+#### Increased Operational Costs:
+Time spent on manual data entry, reconciliation, and error correction diverts resources away from more productive activities, ultimately impacting the agency's bottom line.
+#### Compromised Data Quality
+The lack of a streamlined data management processlead to compromised data quality, including inaccuracies and outdated information.
